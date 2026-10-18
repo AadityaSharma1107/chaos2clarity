@@ -1,31 +1,12 @@
 """
 Lightweight Flask backend for Vercel deployment.
-
-Why this file exists separately from the project root's backend.py:
-The full pipeline (pandas + scikit-learn + matplotlib + numpy) is the correct,
-complete submission for local grading -- see the root backend.py and README.
-But scikit-learn pulls in scipy, and together with matplotlib's own
-dependency chain (Pillow, fonttools, kiwisolver, contourpy...), the installed
-size is ~310 MB, which exceeds Vercel's 225 MB serverless function limit.
-
-Rather than retrain on every cold start with heavy libraries, this version
-loads a model that was already trained once by the root backend.py:
-model_artifacts/trained_model.json (TF-IDF vocab/idf + the NumPy network's
-W1/b1/W2/b2) and model_artifacts/metrics.json. The training-curve, confusion
--matrix and weight plots are the exact PNGs matplotlib produced during that
-run, served as static files -- nothing here re-renders them.
-
-Only Flask, flask-cors, numpy and pandas are required at runtime. The TF-IDF
-transform and the forward pass below are written by hand with NumPy (same
-formulas as scikit-learn's TfidfVectorizer and the NumpySentimentNN class in
-the root backend.py) so predictions on uploaded CSVs match the original
-pipeline, without needing scikit-learn installed here.
+(see README in this folder for why this file is separate from the root backend.py)
 """
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
-import re, os, json, math
+import re, os, json, math, traceback
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE, 'model_artifacts')
@@ -57,30 +38,35 @@ def remove_stopwords(s):
 
 
 def ngrams(text):
-    """unigrams + bigrams, matching the root backend's TfidfVectorizer(ngram_range=(1,2))."""
     words = text.split()
     toks = list(words)
     toks += [f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)]
     return toks
 
 
-with open(os.path.join(MODEL_DIR, 'trained_model.json')) as f:
-    _trained = json.load(f)
-VOCAB = _trained['vocab']
-VOCAB_IDX = {t: i for i, t in enumerate(VOCAB)}
-IDF = np.array(_trained['idf'])
-W1 = np.array(_trained['W1']); b1 = np.array(_trained['b1'])
-W2 = np.array(_trained['W2']); b2 = np.array(_trained['b2'])
-
-with open(os.path.join(MODEL_DIR, 'metrics.json')) as f:
-    metrics = json.load(f)
+# --- Everything that can fail (file I/O, JSON parsing) is wrapped so a bad
+# path or missing file never crashes the whole import. If it fails, the app
+# still starts; /api/debug and /api/health report what went wrong, and
+# /api/analyze & /api/metrics return a clear 503 instead of the server dying. ---
+VOCAB = VOCAB_IDX = IDF = W1 = b1 = W2 = b2 = metrics = None
+LOAD_ERROR = None
+try:
+    MODEL_DIR_LISTING = os.listdir(MODEL_DIR) if os.path.isdir(MODEL_DIR) else None
+    with open(os.path.join(MODEL_DIR, 'trained_model.json')) as f:
+        _trained = json.load(f)
+    VOCAB = _trained['vocab']
+    VOCAB_IDX = {t: i for i, t in enumerate(VOCAB)}
+    IDF = np.array(_trained['idf'])
+    W1 = np.array(_trained['W1']); b1 = np.array(_trained['b1'])
+    W2 = np.array(_trained['W2']); b2 = np.array(_trained['b2'])
+    with open(os.path.join(MODEL_DIR, 'metrics.json')) as f:
+        metrics = json.load(f)
+except Exception:
+    LOAD_ERROR = traceback.format_exc()
+    MODEL_DIR_LISTING = None
 
 
 def tfidf_transform(docs):
-    """Same formula as scikit-learn's TfidfVectorizer with sublinear_tf=True,
-    smooth_idf=True (the defaults the root backend.py trained with): raw
-    counts -> 1+ln(count) -> * idf -> L2-normalize per row. Uses the VOCAB/IDF
-    already fitted during the one-time training run (no re-fitting here)."""
     X = np.zeros((len(docs), len(VOCAB)))
     for i, d in enumerate(docs):
         counts = {}
@@ -146,10 +132,22 @@ def analyze_df(df):
 def index(): return send_from_directory(BASE,'index.html')
 
 @app.get('/api/health')
-def health(): return jsonify({'status':'ok','model':'NumPy neural net (pre-trained)','backend':'Flask'})
+def health(): return jsonify({'status':'ok' if not LOAD_ERROR else 'model_load_failed','backend':'Flask'})
+
+@app.get('/api/debug')
+def debug():
+    return jsonify({
+        'load_error': LOAD_ERROR,
+        'base_dir': BASE,
+        'model_dir': MODEL_DIR,
+        'model_dir_exists': os.path.isdir(MODEL_DIR),
+        'model_dir_listing': MODEL_DIR_LISTING,
+    })
 
 @app.get('/api/metrics')
-def get_metrics(): return jsonify(metrics)
+def get_metrics():
+    if LOAD_ERROR: return jsonify({'error': 'model not loaded', 'detail': LOAD_ERROR}), 503
+    return jsonify(metrics)
 
 PLOT_FILES = {'training_loss.png', 'training_accuracy.png', 'confusion_matrix.png', 'weights.png'}
 
@@ -160,6 +158,7 @@ def plot(name):
 
 @app.post('/api/analyze')
 def analyze():
+    if LOAD_ERROR: return jsonify({'error': 'Model failed to load on the server: ' + LOAD_ERROR.splitlines()[-1]}),503
     if 'file' not in request.files: return jsonify({'error':'Upload a CSV file.'}),400
     f=request.files['file']
     try:
