@@ -1,50 +1,38 @@
+"""
+Lightweight Flask backend for Vercel deployment.
+
+Why this file exists separately from the project root's backend.py:
+The full pipeline (pandas + scikit-learn + matplotlib + numpy) is the correct,
+complete submission for local grading -- see the root backend.py and README.
+But scikit-learn pulls in scipy, and together with matplotlib's own
+dependency chain (Pillow, fonttools, kiwisolver, contourpy...), the installed
+size is ~310 MB, which exceeds Vercel's 225 MB serverless function limit.
+
+Rather than retrain on every cold start with heavy libraries, this version
+loads a model that was already trained once by the root backend.py:
+model_artifacts/trained_model.json (TF-IDF vocab/idf + the NumPy network's
+W1/b1/W2/b2) and model_artifacts/metrics.json. The training-curve, confusion
+-matrix and weight plots are the exact PNGs matplotlib produced during that
+run, served as static files -- nothing here re-renders them.
+
+Only Flask, flask-cors, numpy and pandas are required at runtime. The TF-IDF
+transform and the forward pass below are written by hand with NumPy (same
+formulas as scikit-learn's TfidfVectorizer and the NumpySentimentNN class in
+the root backend.py) so predictions on uploaded CSVs match the original
+pipeline, without needing scikit-learn installed here.
+"""
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
-import re, os, json
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+import re, os, json, math
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-TRAIN_CSV = os.path.join(BASE, 'sentiment_training.csv')
-
-# On a normal machine this writes model_artifacts/ next to backend.py. On a
-# read-only serverless deployment (e.g. Vercel Functions) the project folder
-# itself can't be written to, so fall back to the system temp dir in that case.
 MODEL_DIR = os.path.join(BASE, 'model_artifacts')
-try:
-    os.makedirs(MODEL_DIR, exist_ok=True)
-except OSError:
-    import tempfile
-    MODEL_DIR = os.path.join(tempfile.gettempdir(), 'complaintiq_model_artifacts')
-    os.makedirs(MODEL_DIR, exist_ok=True)
 
-# Serve ONLY index.html from this process (no static_folder=BASE). Serving the
-# whole project directory as static files used to also publish backend.py,
-# requirements.txt, etc. over HTTP, and left the plot route competing with a
-# catch-all static rule -- any plot name not in an allowlist (e.g. a plot
-# added later, like the ones Phase 2 adds below) would silently fall through
-# to that catch-all and 404 instead of hitting /api/plots/<name>. Keeping
-# Flask static-free and whitelisting plot files explicitly avoids both.
 app = Flask(__name__)
 CORS(app)
 
-# ---------------------------------------------------------------------------
-# Phase 2: shared training data.
-# sentiment_training.csv is the SAME 90-sentence, class-balanced dataset used
-# by the in-browser JavaScript model (index.html's POS/NEG arrays). Both
-# models train and evaluate on identical text, so the browser demo and the
-# Python/NumPy pipeline are directly comparable instead of being two
-# unrelated toy datasets.
-# ---------------------------------------------------------------------------
-
-# Same stopword list used by the JS tokenizer, so "removing stopwords" means
-# the same thing on both sides of the project.
 STOPWORDS = set(
     "a an the and or of to in on at for with is are was were be been am i me my "
     "we our you your it its this that these those as by from so then than there "
@@ -54,7 +42,6 @@ STOPWORDS = set(
 
 
 def clean_text(s):
-    """Lowercase + normalize text (Pandas/regex step)."""
     s = '' if pd.isna(s) else str(s)
     s = s.lower()
     s = re.sub(r'http\S+|www\.\S+', ' ', s)
@@ -66,121 +53,57 @@ def clean_text(s):
 
 
 def remove_stopwords(s):
-    """Explicit stopword-removal step (kept separate from clean_text so it is
-    easy to point to for the Phase 2 'removing stopwords' requirement)."""
     return ' '.join(w for w in s.split() if w not in STOPWORDS)
 
 
-class NumpySentimentNN:
-    """Two-layer neural net implemented only with NumPy for the train/predict math."""
-    def __init__(self, input_dim, hidden=32, lr=0.08, seed=42):
-        rng = np.random.default_rng(seed)
-        self.W1 = rng.normal(0, np.sqrt(2/input_dim), (input_dim, hidden))
-        self.b1 = np.zeros((1, hidden))
-        self.W2 = rng.normal(0, np.sqrt(2/hidden), (hidden, 1))
-        self.b2 = np.zeros((1, 1))
-        self.lr = lr
-
-    @staticmethod
-    def sigmoid(z):
-        z = np.clip(z, -30, 30)
-        return 1/(1+np.exp(-z))
-
-    def forward(self, X):
-        z1 = X @ self.W1 + self.b1
-        a1 = np.maximum(0, z1)
-        z2 = a1 @ self.W2 + self.b2
-        a2 = self.sigmoid(z2)
-        return z1, a1, a2
-
-    def fit(self, X, y, epochs=300):
-        y = y.reshape(-1,1)
-        hist = {'loss': [], 'accuracy': []}
-        for _ in range(epochs):
-            z1,a1,p = self.forward(X)
-            eps=1e-8
-            loss = -np.mean(y*np.log(p+eps)+(1-y)*np.log(1-p+eps))
-            pred=(p>=0.5).astype(int)
-            acc=np.mean(pred==y)
-            dz2=p-y
-            dW2=a1.T @ dz2 / len(X); db2=np.mean(dz2,axis=0,keepdims=True)
-            da1=dz2 @ self.W2.T; dz1=da1*(z1>0)
-            dW1=X.T @ dz1 / len(X); db1=np.mean(dz1,axis=0,keepdims=True)
-            self.W2-=self.lr*dW2; self.b2-=self.lr*db2
-            self.W1-=self.lr*dW1; self.b1-=self.lr*db1
-            hist['loss'].append(float(loss)); hist['accuracy'].append(float(acc))
-        return hist
-
-    def predict_proba(self,X):
-        return self.forward(X)[2].ravel()
-
-vectorizer = None
-model = None
-metrics = {}
+def ngrams(text):
+    """unigrams + bigrams, matching the root backend's TfidfVectorizer(ngram_range=(1,2))."""
+    words = text.split()
+    toks = list(words)
+    toks += [f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)]
+    return toks
 
 
-def train_model():
-    global vectorizer, model, metrics
+with open(os.path.join(MODEL_DIR, 'trained_model.json')) as f:
+    _trained = json.load(f)
+VOCAB = _trained['vocab']
+VOCAB_IDX = {t: i for i, t in enumerate(VOCAB)}
+IDF = np.array(_trained['idf'])
+W1 = np.array(_trained['W1']); b1 = np.array(_trained['b1'])
+W2 = np.array(_trained['W2']); b2 = np.array(_trained['b2'])
 
-    # --- Data Preprocessing (Pandas): load, clean, normalize, strip stopwords ---
-    df = pd.read_csv(TRAIN_CSV)
-    df['clean'] = df['text'].map(clean_text).map(remove_stopwords)
+with open(os.path.join(MODEL_DIR, 'metrics.json')) as f:
+    metrics = json.load(f)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        df['clean'], df['label'], test_size=.25, random_state=42, stratify=df['label']
-    )
 
-    # --- Model Implementation: TF-IDF features + from-scratch NumPy NN ---
-    vectorizer = TfidfVectorizer(ngram_range=(1,2), max_features=700, min_df=1, sublinear_tf=True)
-    A = vectorizer.fit_transform(X_train).toarray(); B=vectorizer.transform(X_test).toarray()
-    model = NumpySentimentNN(A.shape[1], hidden=32, lr=.08)
-    hist=model.fit(A,y_train.to_numpy(),epochs=300)
-    probs=model.predict_proba(B); pred=(probs>=.5).astype(int)
-    y_test_arr = y_test.to_numpy()
+def tfidf_transform(docs):
+    """Same formula as scikit-learn's TfidfVectorizer with sublinear_tf=True,
+    smooth_idf=True (the defaults the root backend.py trained with): raw
+    counts -> 1+ln(count) -> * idf -> L2-normalize per row. Uses the VOCAB/IDF
+    already fitted during the one-time training run (no re-fitting here)."""
+    X = np.zeros((len(docs), len(VOCAB)))
+    for i, d in enumerate(docs):
+        counts = {}
+        for t in ngrams(d):
+            j = VOCAB_IDX.get(t)
+            if j is not None:
+                counts[j] = counts.get(j, 0) + 1
+        for j, c in counts.items():
+            X[i, j] = (1 + math.log(c)) * IDF[j]
+        norm = np.linalg.norm(X[i])
+        if norm > 0:
+            X[i] /= norm
+    return X
 
-    # --- Evaluation (Scikit-learn): accuracy / precision / recall / F1 + confusion matrix ---
-    cm = confusion_matrix(y_test_arr, pred, labels=[0,1])
-    metrics={
-        'accuracy': round(accuracy_score(y_test_arr,pred)*100,1),
-        'precision': round(precision_score(y_test_arr,pred,zero_division=0)*100,1),
-        'recall': round(recall_score(y_test_arr,pred,zero_division=0)*100,1),
-        'f1': round(f1_score(y_test_arr,pred,zero_division=0)*100,1),
-        'test_size': int(len(y_test_arr)),
-        'train_size': int(len(y_train)),
-        'epochs': 300,
-        'features': int(A.shape[1]),
-        'confusion_matrix': cm.tolist(),  # [[TN, FP], [FN, TP]]
-    }
 
-    # --- Visualization (Matplotlib) ---
-    plt.figure(figsize=(8,4.2)); plt.plot(hist['loss']); plt.title('ComplaintIQ -- NumPy NN Training Loss'); plt.xlabel('Epoch'); plt.ylabel('Binary Cross-Entropy'); plt.grid(alpha=.2); plt.tight_layout(); plt.savefig(os.path.join(MODEL_DIR,'training_loss.png'),dpi=150); plt.close()
-    plt.figure(figsize=(8,4.2)); plt.plot(np.array(hist['accuracy'])*100); plt.title('ComplaintIQ -- NumPy NN Training Accuracy'); plt.xlabel('Epoch'); plt.ylabel('Accuracy (%)'); plt.grid(alpha=.2); plt.tight_layout(); plt.savefig(os.path.join(MODEL_DIR,'training_accuracy.png'),dpi=150); plt.close()
+def predict_proba(texts):
+    X = tfidf_transform(texts)
+    z1 = X @ W1 + b1
+    a1 = np.maximum(0, z1)
+    z2 = a1 @ W2 + b2
+    z2 = np.clip(z2, -30, 30)
+    return (1 / (1 + np.exp(-z2))).ravel()
 
-    fig, ax = plt.subplots(figsize=(4.6,4.2))
-    im = ax.imshow(cm, cmap='Purples')
-    ax.set_title('ComplaintIQ -- Confusion Matrix (test set)')
-    ax.set_xticks([0,1]); ax.set_xticklabels(['Pred: Unhappy','Pred: Happy'])
-    ax.set_yticks([0,1]); ax.set_yticklabels(['True: Unhappy','True: Happy'])
-    for i in range(2):
-        for j in range(2):
-            ax.text(j, i, int(cm[i,j]), ha='center', va='center',
-                     color='white' if cm[i,j] > cm.max()/2 else 'black', fontsize=14, fontweight='bold')
-    fig.colorbar(im, fraction=0.046, pad=0.04); fig.tight_layout(); fig.savefig(os.path.join(MODEL_DIR,'confusion_matrix.png'),dpi=150); plt.close(fig)
-
-    # Weight visualization: W1 (hidden units x TF-IDF features) gives a simple
-    # picture of what the from-scratch network learned.
-    plt.figure(figsize=(8,4.2))
-    vmax = float(np.max(np.abs(model.W1))) or 1.0
-    plt.imshow(model.W1.T, aspect='auto', cmap='coolwarm', vmin=-vmax, vmax=vmax)
-    plt.colorbar(label='weight value')
-    plt.title('ComplaintIQ -- Hidden Layer Weights (W1, hidden units x TF-IDF features)')
-    plt.xlabel('TF-IDF feature index'); plt.ylabel('Hidden unit')
-    plt.tight_layout(); plt.savefig(os.path.join(MODEL_DIR,'weights.png'),dpi=150); plt.close()
-
-    with open(os.path.join(MODEL_DIR,'metrics.json'),'w') as f: json.dump(metrics,f,indent=2)
-    return metrics
-
-train_model()
 
 CATEGORIES = ['Delivery','Billing & Refunds','Product Quality','Customer Service','App & Website','Account & Login','Cancellation','Other']
 
@@ -205,7 +128,7 @@ def analyze_df(df):
     if 'complaint' not in df.columns: raise ValueError('CSV must contain a complaint column.')
     df['complaint']=df['complaint'].fillna('').astype(str); df=df[df.complaint.str.strip()!=''].copy()
     df['clean_text']=df.complaint.map(clean_text).map(remove_stopwords)
-    probs=model.predict_proba(vectorizer.transform(df.clean_text).toarray())
+    probs=predict_proba(df.clean_text.tolist())
     df['sentiment_score']=(probs*10).round(1)
     df['sentiment']=np.where(probs>=.5,'Happy','Unhappy')
     df['category']=df.complaint.map(category)
@@ -223,7 +146,7 @@ def analyze_df(df):
 def index(): return send_from_directory(BASE,'index.html')
 
 @app.get('/api/health')
-def health(): return jsonify({'status':'ok','model':'NumPy neural net','backend':'Flask'})
+def health(): return jsonify({'status':'ok','model':'NumPy neural net (pre-trained)','backend':'Flask'})
 
 @app.get('/api/metrics')
 def get_metrics(): return jsonify(metrics)
@@ -256,6 +179,4 @@ def analyze():
     except Exception as e: return jsonify({'error':str(e)}),400
 
 if __name__=='__main__':
-    print(f"ComplaintIQ backend ready -- accuracy {metrics['accuracy']}% / F1 {metrics['f1']}% on {metrics['test_size']} held-out test sentences.")
-    print("Open http://127.0.0.1:5000/ in your browser (the dashboard is served by this same process).")
     app.run(host='127.0.0.1',port=5000,debug=False)

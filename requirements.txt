@@ -2,5 +2,3 @@ Flask>=3.0
 flask-cors>=4.0
 pandas>=2.0
 numpy>=1.26
-scikit-learn>=1.4
-matplotlib>=3.8

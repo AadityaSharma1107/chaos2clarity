@@ -1,7 +1,10 @@
 __pycache__/
 *.pyc
-model_artifacts/
+/model_artifacts/
 .venv/
 venv/
 node_modules/
 .vercel/
+# NOTE: deploy/model_artifacts/ is intentionally NOT ignored -- those PNGs
+# and trained_model.json must be committed; Vercel's lite backend loads them
+# instead of retraining with scikit-learn/matplotlib at runtime.
