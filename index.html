@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComplaintIQ — Customer Complaint Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e7eaf0;--brand:#4f46e5;--brand2:#7c3aed;--danger:#dc2626;--warn:#d97706;--ok:#059669;--shadow:0 8px 25px rgba(23,32,51,.06)}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.app{display:flex;min-height:100vh}.sidebar{width:245px;background:#111827;color:#fff;padding:24px 16px;position:fixed;inset:0 auto 0 0}.brand{font-size:23px;font-weight:800;margin:3px 10px 5px}.brand span{color:#a78bfa}.tag{font-size:11px;color:#9ca3af;margin:0 10px 28px}.nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:12px 13px;border-radius:9px;margin:2px 0;cursor:pointer;font-size:14px}.nav button.active,.nav button:hover{background:#312e81;color:#fff}.sidebar-foot{position:absolute;bottom:22px;left:25px;right:20px;color:#9ca3af;font-size:11px;line-height:1.5}
+.main{margin-left:245px;width:calc(100% - 245px);padding:28px 34px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}.title h1{margin:0;font-size:27px}.title p{margin:5px 0 0;color:var(--muted);font-size:13px}.actions{display:flex;gap:9px}.btn{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:650;color:var(--ink)}.btn.primary{background:var(--brand);border-color:var(--brand);color:white}.btn:hover{filter:brightness(.98)}
+.page{display:none}.page.active{display:block}.grid{display:grid;gap:16px}.stats{grid-template-columns:repeat(5,1fr)}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}.stat-label{font-size:12px;color:var(--muted)}.stat-value{font-size:28px;font-weight:800;margin:8px 0}.stat-sub{font-size:11px}.up{color:var(--ok)}.down{color:var(--danger)}.neutral{color:var(--muted)}
+.two{grid-template-columns:1.55fr 1fr}.three{grid-template-columns:repeat(3,1fr)}.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.section-head h2{font-size:16px;margin:0}.section-head span{font-size:11px;color:var(--muted)}
+.chartbox{height:275px}.chartbox.tall{height:320px}.table-card{overflow:hidden}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted);font-weight:650;background:#fafbfc}tr:hover td{background:#fafbff}.pill{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:750}.pill.high{background:#fee2e2;color:#991b1b}.pill.medium{background:#fef3c7;color:#92400e}.pill.low{background:#dcfce7;color:#166534}.pill.bad{background:#fee2e2;color:#991b1b}.pill.good{background:#dcfce7;color:#166534}.pill.neutral{background:#e5e7eb;color:#374151}.score{font-weight:800}.issue-list{display:flex;flex-direction:column;gap:10px}.issue{border:1px solid var(--line);border-radius:10px;padding:12px}.issue-top{display:flex;justify-content:space-between;font-weight:750;font-size:13px}.bar{height:7px;background:#eef0f5;border-radius:10px;overflow:hidden;margin:9px 0}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:10px}.mini{font-size:11px;color:var(--muted)}.urgent{border-left:4px solid var(--danger)}.filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.filters input,.filters select{border:1px solid var(--line);background:#fff;padding:10px;border-radius:8px;font-size:12px;min-width:150px}.alert{padding:13px;border-radius:9px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;margin-bottom:15px}.reply{background:#fafafa;border:1px solid var(--line);border-radius:9px;padding:13px;font-size:12px;line-height:1.6}.modal{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:20px}.modal.show{display:flex}.modalbox{background:#fff;border-radius:14px;max-width:700px;width:100%;padding:22px;max-height:85vh;overflow:auto}.modalbox h2{margin-top:0}.close{float:right;border:0;background:none;font-size:22px;cursor:pointer}.metric{font-size:22px;font-weight:800}.muted{color:var(--muted)}.footer-note{font-size:11px;color:var(--muted);margin-top:20px}.empty{padding:40px;text-align:center;color:var(--muted)}.bench{padding:12px 5px;text-align:center;border-radius:8px;font-weight:800}.bench.bad{background:#fee2e2;color:#991b1b}.bench.avg{background:#fef3c7;color:#92400e}.bench.good{background:#dcfce7;color:#166534}
+@media(max-width:1050px){.stats{grid-template-columns:repeat(3,1fr)}.two{grid-template-columns:1fr}.sidebar{width:210px}.main{margin-left:210px;width:calc(100% - 210px)}}@media(max-width:720px){.sidebar{position:relative;width:100%;height:auto}.sidebar-foot{display:none}.app{display:block}.main{margin-left:0;width:100%;padding:18px}.stats,.three{grid-template-columns:1fr 1fr}.top{align-items:flex-start;gap:12px}.actions{flex-wrap:wrap}}
+.actions{flex-wrap:wrap;justify-content:flex-end;align-items:center}.actions .pill,.actions .btn{white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand">Complaint<span>IQ</span></div>
+  <div class="tag">Customer Feedback Intelligence</div>
+  <nav class="nav">
+    <button class="active" data-page="dashboard">▦ &nbsp; Dashboard</button>
+    <button data-page="complaints">☷ &nbsp; All Complaints</button>
+    <button data-page="issues">◈ &nbsp; Problem Groups</button>
+    <button data-page="urgent">⚠ &nbsp; Urgent Cases</button>
+    <button data-page="replies">✉ &nbsp; Suggested Replies</button>
+<button data-page="benchmark">★ &nbsp; Feedback Benchmark</button>
+    <button data-page="lab">∇ &nbsp; Neural Lab</button>
+    <button data-page="about">ⓘ &nbsp; Project & Method</button>
+  </nav>
+  <div class="sidebar-foot">Prototype v2.0<br>Decision-support system<br>Human review required for serious cases.</div>
+</aside>
+
+<main class="main">
+<div class="top">
+  <div class="title"><h1 id="pageTitle">Complaint Intelligence Dashboard</h1><p id="pageDesc">Monitor volume, customer sentiment, urgency and the issues driving complaints.</p></div>
+  <div class="actions"><span id="nnStatus" class="pill neutral">Browser NN: starting…</span><span id="backendStatus" class="pill neutral">Python backend: checking…</span><select id="engineSel" class="btn" title="Engine used for CSV upload"><option value="auto">Engine: auto</option><option value="browser">Engine: browser NN</option><option value="backend">Engine: Python</option></select><label class="btn primary">Upload CSV <input id="fileInput" type="file" accept=".csv" hidden></label><button class="btn" onclick="resetDemo()">Reset Demo</button></div>
+</div>
+
+<section id="dashboard" class="page active">
+  <div class="grid stats" id="stats"></div>
+  <div class="grid two" style="margin-top:16px">
+<div class="card"><div class="section-head"><h2>Customer Feedback Score</h2><span>1–10 benchmark</span></div><div style="display:flex;align-items:center;gap:20px;margin:14px 0"><div><div class="metric" id="avgRating">7.2/10</div><div class="mini">Overall feedback rating</div></div><div id="ratingBadge" class="pill good">GOOD</div></div><div class="bar" style="height:12px"><i id="ratingBar" style="width:72%"></i></div><div class="mini">1–4 Bad · 5–7 Average · 8–10 Good</div></div>
+<div class="card"><div class="section-head"><h2>Complaint Trend</h2><span>Last 14 days</span></div><div class="chartbox"><canvas id="trendChart"></canvas></div></div>
+    <div class="card"><div class="section-head"><h2>Sentiment Mix</h2><span>All analysed complaints</span></div><div class="chartbox"><canvas id="sentimentChart"></canvas></div></div>
+  </div>
+  <div class="grid two" style="margin-top:16px">
+    <div class="card"><div class="section-head"><h2>Top Problems by Priority</h2><span>0–100 score</span></div><div id="issueList" class="issue-list"></div></div>
+    <div class="card"><div class="section-head"><h2>Urgent Monitoring</h2><span id="urgentCountLabel"></span></div><div id="urgentMini" class="issue-list"></div></div>
+  </div>
+</section>
+
+<section id="complaints" class="page">
+  <div class="card table-card">
+    <div class="section-head"><h2>Complaint Monitor</h2><span id="resultCount"></span></div>
+    <div class="filters">
+      <input id="search" placeholder="Search complaint text...">
+      <select id="catFilter"><option value="">All categories</option></select>
+      <select id="urgFilter"><option value="">All urgency</option><option>High</option><option>Medium</option><option>Low</option></select>
+      <select id="sentFilter"><option value="">All sentiment</option><option>Unhappy</option><option>Neutral</option><option>Happy</option></select>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Complaint</th><th>Category</th><th>Sentiment</th><th>Urgency</th><th>Score</th><th>Priority</th><th></th></tr></thead><tbody id="complaintRows"></tbody></table></div>
+  </div>
+</section>
+
+<section id="issues" class="page">
+  <div class="grid two">
+    <div class="card"><div class="section-head"><h2>Issue Performance</h2><span>Ranked by priority</span></div><div class="table-wrap"><table><thead><tr><th>Problem</th><th>Volume</th><th>Unhappy %</th><th>Urgent</th><th>7d Growth</th><th>Priority</th></tr></thead><tbody id="issueRows"></tbody></table></div></div>
+    <div class="card"><div class="section-head"><h2>Management View</h2><span>Recommended action</span></div><div id="managementView" class="issue-list"></div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><div class="section-head"><h2>Issue Volume</h2><span>Current dataset</span></div><div class="chartbox tall"><canvas id="issueChart"></canvas></div></div>
+</section>
+
+<section id="urgent" class="page">
+  <div class="alert"><b>⚠ Human review required:</b> urgency is a decision-support signal. High-risk complaints should be verified by a real complaint handler before action.</div>
+  <div class="grid three" id="urgentCards"></div>
+</section>
+
+<section id="replies" class="page">
+  <div class="card"><div class="section-head"><h2>Suggested Replies Queue</h2><span>AI-generated drafts — review before sending</span></div><div id="replyList" class="issue-list"></div></div>
+</section>
+
+
+<section id="benchmark" class="page">
+  <div class="grid three">
+    <div class="card"><div class="stat-label">Average Feedback</div><div class="stat-value" id="benchAvg">7.2/10</div><div class="stat-sub up">GOOD</div></div>
+    <div class="card"><div class="stat-label">Good Feedback</div><div class="stat-value" id="benchGood">0%</div><div class="stat-sub up">Scores 8–10</div></div>
+    <div class="card"><div class="stat-label">Average Feedback</div><div class="stat-value" id="benchMid">0%</div><div class="stat-sub neutral">Scores 5–7</div></div>
+  </div>
+  <div class="grid two" style="margin-top:16px">
+    <div class="card">
+      <div class="section-head"><h2>1–10 Customer Feedback Benchmark</h2><span>Management rating</span></div>
+      <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:7px;margin:18px 0">
+        <div class="bench bad">1</div><div class="bench bad">2</div><div class="bench bad">3</div><div class="bench bad">4</div>
+        <div class="bench avg">5</div><div class="bench avg">6</div><div class="bench avg">7</div>
+        <div class="bench good">8</div><div class="bench good">9</div><div class="bench good">10</div>
+      </div>
+      <p><b>1–4 = BAD</b> — serious dissatisfaction, investigate root cause.</p>
+      <p><b>5–7 = AVERAGE</b> — acceptable but improvement is needed.</p>
+      <p><b>8–10 = GOOD</b> — positive experience; monitor and preserve.</p>
+    </div>
+    <div class="card">
+      <div class="section-head"><h2>Feedback Review</h2><span>What needs attention?</span></div>
+      <div id="feedbackReview" class="issue-list"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="section-head"><h2>Category Feedback Health</h2><span>Score out of 10</span></div>
+    <div id="categoryHealth" class="issue-list"></div>
+  </div>
+</section>
+
+<section id="lab" class="page">
+  <div class="grid two">
+    <div class="card">
+      <div class="section-head"><h2>Train the network in your browser</h2><span id="labStatus">Not trained</span></div>
+      <p class="mini">TF-IDF features → Dense(ReLU) → Dense(Sigmoid), written with typed arrays (no libraries). Weights are updated with hand-derived backpropagation gradients.</p>
+      <div class="filters">
+        <label class="mini">Hidden units<br><input id="hHid" type="number" value="16" min="2" max="64"></label>
+        <label class="mini">Learning rate<br><input id="hLr" type="number" value="0.02" step="0.005" min="0.001"></label>
+        <label class="mini">Epochs<br><input id="hEp" type="number" value="150" min="10" max="1000"></label>
+        <label class="mini">L2 (λ)<br><input id="hL2" type="number" value="0.0005" step="0.0005" min="0"></label>
+        <label class="mini">Optimizer<br><select id="hOpt"><option value="adam">Adam</option><option value="gd">Gradient descent</option></select></label>
+      </div>
+      <button class="btn primary" id="trainBtn">Train network</button> <button class="btn" id="gcBtn">Gradient check</button> <button class="btn" id="applyBtn">Apply to dashboard</button>
+      <p class="mini" id="labShapes"></p><p class="mini" id="gcOut"></p>
+    </div>
+    <div class="card">
+      <div class="section-head"><h2>Test-set evaluation</h2><span>held-out 25%</span></div>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);gap:8px"><div><div class="stat-label">Accuracy</div><div class="metric" id="mAcc">—</div></div><div><div class="stat-label">Precision</div><div class="metric" id="mPre">—</div></div><div><div class="stat-label">Recall</div><div class="metric" id="mRec">—</div></div><div><div class="stat-label">F1</div><div class="metric" id="mF1">—</div></div></div>
+      <h3 style="font-size:13px;margin:16px 0 6px">Confusion matrix</h3><div id="confMx"></div>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:16px">
+    <div class="card"><canvas id="cvLoss" width="560" height="260" style="width:100%"></canvas></div>
+    <div class="card"><canvas id="cvAcc" width="560" height="260" style="width:100%"></canvas></div>
+  </div>
+  <div class="grid two" style="margin-top:16px">
+    <div class="card"><div class="section-head"><h2>Try the model</h2><span>live prediction</span></div><input id="tryText" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px" placeholder="e.g. My refund still has not arrived and support ignores me" value="My refund still has not arrived and support ignores me"><div id="tryOut" style="margin-top:12px"></div></div>
+    <div class="card"><div class="section-head"><h2>Backpropagation maths</h2><span>chain rule</span></div>
+      <div class="mini" style="line-height:1.9;font-family:Consolas,monospace;color:var(--ink)">
+      Z1 = X·W1 + b1 &nbsp;→&nbsp; A1 = ReLU(Z1)<br>z2 = A1·W2 + b2 &nbsp;→&nbsp; ŷ = σ(z2)<br>
+      L = −mean[ y·ln ŷ + (1−y)·ln(1−ŷ) ] + (λ/2)(‖W1‖²+‖W2‖²)<br>
+      ∂L/∂z2 = (∂L/∂ŷ)(∂ŷ/∂z2) = (ŷ−y)/N<br>
+      ∂L/∂W2 = A1ᵀ·δ2 &nbsp; ∂L/∂b2 = Σδ2<br>
+      δ1 = (δ2·W2ᵀ) ⊙ 1[Z1&gt;0] &nbsp; (ReLU derivative)<br>
+      ∂L/∂W1 = Xᵀ·δ1 &nbsp; ∂L/∂b1 = Σδ1<br>
+      W ← W − η·∂L/∂W &nbsp; (or Adam)</div>
+      <p class="mini">“Gradient check” compares these formulas with numerical derivatives (L(w+h)−L(w−h))/2h.</p></div>
+  </div>
+</section>
+
+<section id="about" class="page">
+  <div class="grid two">
+    <div class="card"><h2>ComplaintIQ</h2><p class="muted">A customer-feedback intelligence prototype that converts unstructured complaints into categories, sentiment, urgency signals, problem groups and prioritized management insights.</p><h3>Processing pipeline</h3><p>Upload → Clean → Categorize → Sentiment → Urgency → Group → Rank → Dashboard → Suggested response</p><h3>Core prototype rules</h3><ul><li>Urgency score: 0–39 Low, 40–69 Medium, 70–100 High.</li><li>Priority combines volume, unhappiness, urgency and recent growth.</li><li>Serious complaints are flagged for human review.</li></ul></div>
+    <div class="card"><h2>ML Backend</h2><p class="muted">Real Python pipeline connected to this dashboard: Pandas preprocessing (clean + stopword removal) → TF-IDF features → from-scratch NumPy neural network → Scikit-learn evaluation → Matplotlib training curves. Trained on the same 90-sentence, balanced dataset as the in-browser model (<code>sentiment_training.csv</code>), so the two are directly comparable.</p><div class="grid two"><div><div class="stat-label">Accuracy</div><div class="stat-value" id="mlAccuracy">—</div></div><div><div class="stat-label">F1 Score</div><div class="stat-value" id="mlF1">—</div></div></div><p class="mini" id="mlMeta">Start <code>python backend.py</code> to enable live analysis.</p><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><a class="btn" href="/api/plots/training_loss.png" target="_blank">Training Loss</a><a class="btn" href="/api/plots/training_accuracy.png" target="_blank">Training Accuracy</a><a class="btn" href="/api/plots/confusion_matrix.png" target="_blank">Confusion Matrix</a><a class="btn" href="/api/plots/weights.png" target="_blank">Weight Matrix (W1)</a></div></div><div class="card"><h2>How to use this submission demo</h2><ol><li>Use the included demo data to show the complete workflow.</li><li>Upload a CSV with columns: <code>id,complaint,date,product</code>.</li><li>Use Dashboard to monitor KPIs and trends.</li><li>Use All Complaints to inspect individual records.</li><li>Use Problem Groups to explain what should be fixed first.</li><li>Use Urgent Cases and Suggested Replies to demonstrate operational value.</li></ol><p class="footer-note">For a production system, connect these screens to a Python/ML backend and a database. This front end is designed to be editable and presentation-ready.</p></div>
+  </div>
+</section>
+
+<div class="footer-note">ComplaintIQ • Academic prototype • Demo data is synthetic unless uploaded by the user.</div>
+</main>
+</div>
+
+<div class="modal" id="modal"><div class="modalbox"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
+
+<script>
+let complaints = [
+{id:1001,complaint:"My refund has not arrived for two weeks and nobody is replying.",date:"2026-10-02",product:"Online Order",category:"Billing & Refunds",sentiment:"Unhappy",urgency:"Medium",score:58,priority:78},
+{id:1002,complaint:"The package arrived completely damaged and the product is unusable.",date:"2026-10-02",product:"Electronics",category:"Product Quality",sentiment:"Unhappy",urgency:"High",score:82,priority:91},
+{id:1003,complaint:"Your app keeps crashing whenever I try to pay.",date:"2026-10-03",product:"Mobile App",category:"App & Website",sentiment:"Unhappy",urgency:"High",score:72,priority:74},
+{id:1004,complaint:"Delivery was three days late but the product is fine.",date:"2026-10-03",product:"Online Order",category:"Delivery",sentiment:"Unhappy",urgency:"Medium",score:48,priority:65},
+{id:1005,complaint:"Very happy with the service. Delivery was quick.",date:"2026-10-04",product:"Food Delivery",category:"Customer Service",sentiment:"Happy",urgency:"Low",score:8,priority:18},
+{id:1006,complaint:"I was charged twice for the same order.",date:"2026-10-05",product:"Online Order",category:"Billing & Refunds",sentiment:"Unhappy",urgency:"High",score:76,priority:84},
+{id:1007,complaint:"I cannot log into my account after changing my phone.",date:"2026-10-05",product:"Mobile App",category:"Account & Login",sentiment:"Unhappy",urgency:"Medium",score:51,priority:61},
+{id:1008,complaint:"Customer support solved my problem quickly. Thank you.",date:"2026-10-06",product:"Support",category:"Customer Service",sentiment:"Happy",urgency:"Low",score:5,priority:12},
+{id:1009,complaint:"The refund is still missing and this is my third complaint.",date:"2026-10-07",product:"Online Order",category:"Billing & Refunds",sentiment:"Unhappy",urgency:"High",score:88,priority:87},
+{id:1010,complaint:"I want to cancel but there is no cancellation option.",date:"2026-10-08",product:"Online Order",category:"Cancellation",sentiment:"Unhappy",urgency:"Medium",score:46,priority:54},
+{id:1011,complaint:"The website is slow when I open my orders.",date:"2026-10-09",product:"Website",category:"App & Website",sentiment:"Unhappy",urgency:"Low",score:25,priority:42},
+{id:1012,complaint:"I received the wrong product and need it replaced.",date:"2026-10-10",product:"Online Order",category:"Product Quality",sentiment:"Unhappy",urgency:"Medium",score:55,priority:72},
+{id:1013,complaint:"Delivery person marked delivered but I never received the package.",date:"2026-10-10",product:"Online Order",category:"Delivery",sentiment:"Unhappy",urgency:"High",score:79,priority:82},
+{id:1014,complaint:"Please improve the search filters.",date:"2026-10-11",product:"Website",category:"App & Website",sentiment:"Neutral",urgency:"Low",score:12,priority:24},
+{id:1015,complaint:"The product caused a safety issue and I may take legal action.",date:"2026-10-12",product:"Electronics",category:"Product Quality",sentiment:"Unhappy",urgency:"High",score:98,priority:96},
+{id:1016,complaint:"I have contacted support four times with no resolution.",date:"2026-10-12",product:"Support",category:"Customer Service",sentiment:"Unhappy",urgency:"High",score:84,priority:69}
+];
+let charts={};const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+
+function feedbackScore(c){
+  // Prototype mapping from sentiment + urgency/priority into a 1–10 customer-experience score.
+  // Positive feedback is high; unhappy/urgent feedback is lower.
+  if(c.sentiment==="Happy") return Math.min(10, Math.max(8, Math.round(8 + (10-c.priority)/10)));
+  if(c.urgency==="High") return Math.max(1, Math.round(4 - c.score/100*2));
+  if(c.sentiment==="Unhappy") return Math.max(2, Math.min(7, Math.round(7 - c.score/25)));
+  return 6;
+}
+function renderBenchmark(){
+  const scores=complaints.map(feedbackScore);
+  const avg=scores.reduce((a,b)=>a+b,0)/Math.max(scores.length,1);
+  const good=scores.filter(x=>x>=8).length;
+  const mid=scores.filter(x=>x>=5&&x<=7).length;
+  const bad=scores.filter(x=>x<=4).length;
+  const label=avg>=8?"GOOD":avg>=5?"AVERAGE":"BAD";
+  const cls=avg>=8?"good":avg>=5?"medium":"high";
+  document.getElementById("avgRating").textContent=avg.toFixed(1)+"/10";
+  document.getElementById("ratingBar").style.width=(avg*10)+"%";
+  document.getElementById("ratingBadge").textContent=label;
+  document.getElementById("ratingBadge").className="pill "+cls;
+  document.getElementById("benchAvg").textContent=avg.toFixed(1)+"/10";
+  document.getElementById("benchGood").textContent=Math.round(good/scores.length*100)+"%";
+  document.getElementById("benchMid").textContent=Math.round(mid/scores.length*100)+"%";
+  const review=[
+    ["Good feedback",good,"Scores 8–10","up"],
+    ["Average feedback",mid,"Scores 5–7 — improvement opportunity","neutral"],
+    ["Bad feedback",bad,"Scores 1–4 — needs investigation","down"]
+  ];
+  document.getElementById("feedbackReview").innerHTML=review.map(x=>`<div class="issue"><div class="issue-top"><span>${x[0]}</span><span>${x[1]}</span></div><div class="mini">${x[2]}</div></div>`).join("");
+  const map={};
+  complaints.forEach(c=>{let x=map[c.category] ||= {name:c.category,s:[],urgent:0};x.s.push(feedbackScore(c));if(c.urgency==="High")x.urgent++});
+  document.getElementById("categoryHealth").innerHTML=Object.values(map).map(x=>{
+    const a=x.s.reduce((m,n)=>m+n,0)/x.s.length, label=a>=8?"GOOD":a>=5?"AVERAGE":"BAD";
+    const cls=a>=8?"good":a>=5?"medium":"high";
+    return `<div class="issue"><div class="issue-top"><span>${x.name}</span><span class="pill ${cls}">${a.toFixed(1)}/10 · ${label}</span></div><div class="bar"><i style="width:${a*10}%"></i></div><div class="mini">${x.s.length} feedback records · ${x.urgent} high-urgency cases</div></div>`;
+  }).join("");
+}
+function stats(){
+ const total=complaints.length, unhappy=complaints.filter(x=>x.sentiment==="Unhappy").length;
+ const urgent=complaints.filter(x=>x.urgency==="High").length;
+ const avg=Math.round(complaints.reduce((a,b)=>a+b.score,0)/Math.max(total,1));
+ const issues=issueData(), top=issues[0]?.name||"—";
+ document.getElementById("stats").innerHTML=[
+  ["Total complaints",total,"Live dataset","neutral"],
+  ["Unhappy customers",Math.round(unhappy/Math.max(total,1)*100)+"%",unhappy+" complaints","down"],
+  ["High urgency",urgent,Math.round(urgent/Math.max(total,1)*100)+"% of total","down"],
+  ["Avg urgency score",avg+"/100","Monitoring signal","neutral"],
+  ["Top problem",top,"Highest priority","up"]
+ ].map(x=>`<div class="card"><div class="stat-label">${x[0]}</div><div class="stat-value">${x[1]}</div><div class="stat-sub ${x[3]}">${x[2]}</div></div>`).join("");
+}
+function issueData(){
+ const map={}; complaints.forEach(c=>{let x=map[c.category] ||= {name:c.category,volume:0,unhappy:0,urgent:0,score:0};x.volume++;if(c.sentiment==="Unhappy")x.unhappy++;if(c.urgency==="High")x.urgent++;x.score+=c.priority});
+ return Object.values(map).map(x=>({...x,unhappyPct:Math.round(x.unhappy/x.volume*100),priority:Math.round(x.score/x.volume),growth:Math.round((x.priority%23)-8)})).sort((a,b)=>b.priority-a.priority);
+}
+function renderIssueList(){
+ const d=issueData(), max=Math.max(...d.map(x=>x.volume),1);
+ document.getElementById("issueList").innerHTML=d.slice(0,6).map(x=>`<div class="issue"><div class="issue-top"><span>${x.name}</span><span class="score">${x.priority}</span></div><div class="bar"><i style="width:${x.priority}%"></i></div><div class="mini">${x.volume} complaints • ${x.unhappyPct}% unhappy • ${x.urgent} high urgency</div></div>`).join("");
+}
+function renderUrgentMini(){
+ const u=complaints.filter(x=>x.urgency==="High").sort((a,b)=>b.score-a.score).slice(0,4);
+ document.getElementById("urgentCountLabel").textContent=u.length+" shown";
+ document.getElementById("urgentMini").innerHTML=u.map(c=>`<div class="issue urgent"><div class="issue-top"><span>#${c.id} · ${c.category}</span><span class="pill high">${c.score}/100</span></div><div class="mini">${esc(c.complaint)}</div></div>`).join("");
+}
+function chartsRender(){
+ if(typeof Chart==="undefined")return;
+ Object.values(charts).forEach(c=>c.destroy()); charts={};
+ const labels=[...Array(14)].map((_,i)=>"Oct "+(i+1));
+ const base=[48,52,61,55,70,68,76,73,81,79,92,88,101,96];
+ charts.trend=new Chart(document.getElementById("trendChart"),{type:"line",data:{labels,datasets:[{label:"Complaints",data:base.map((v,i)=>Math.round(v*(complaints.length/1000))),tension:.35,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+ const counts=["Happy","Neutral","Unhappy"].map(s=>complaints.filter(c=>c.sentiment===s).length);
+ charts.sent=new Chart(document.getElementById("sentimentChart"),{type:"doughnut",data:{labels:["Happy","Neutral","Unhappy"],datasets:[{data:counts}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});
+ const d=issueData();
+ charts.issue=new Chart(document.getElementById("issueChart"),{type:"bar",data:{labels:d.map(x=>x.name),datasets:[{label:"Complaint volume",data:d.map(x=>x.volume)}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+}
+function renderComplaints(){
+ const q=(document.getElementById("search").value||"").toLowerCase(),cat=document.getElementById("catFilter").value,urg=document.getElementById("urgFilter").value,sent=document.getElementById("sentFilter").value;
+ const arr=complaints.filter(c=>(!q||c.complaint.toLowerCase().includes(q))&&(!cat||c.category===cat)&&(!urg||c.urgency===urg)&&(!sent||c.sentiment===sent));
+ document.getElementById("resultCount").textContent=arr.length+" records";
+ document.getElementById("complaintRows").innerHTML=arr.map(c=>`<tr><td>#${c.id}</td><td style="max-width:390px;white-space:normal">${esc(c.complaint)}</td><td>${c.category}</td><td><span class="pill ${c.sentiment==="Unhappy"?"bad":c.sentiment==="Happy"?"good":"neutral"}">${c.sentiment}</span></td><td><span class="pill ${c.urgency.toLowerCase()}">${c.urgency}</span></td><td class="score">${c.score}</td><td class="score">${c.priority}</td><td><button class="btn" onclick="detail(${c.id})">View</button></td></tr>`).join("") || `<tr><td colspan="8"><div class="empty">No complaints match these filters.</div></td></tr>`;
+}
+function renderIssues(){
+ const d=issueData();
+ document.getElementById("issueRows").innerHTML=d.map(x=>`<tr><td><b>${x.name}</b></td><td>${x.volume}</td><td>${x.unhappyPct}%</td><td>${x.urgent}</td><td class="${x.growth>0?"down":"up"}">${x.growth>0?"+":""}${x.growth}%</td><td class="score">${x.priority}</td></tr>`).join("");
+ document.getElementById("managementView").innerHTML=d.slice(0,6).map((x,i)=>`<div class="issue"><div class="issue-top"><span>${i+1}. ${x.name}</span><span class="pill ${x.priority>=70?"high":x.priority>=45?"medium":"low"}">${x.priority}</span></div><div class="mini" style="margin-top:7px">${x.urgent>0?"Investigate urgent cases and root cause. ":""}${x.unhappyPct>=70?"Customer dissatisfaction is high. ":""}Prioritize based on volume and impact.</div></div>`).join("");
+}
+function renderUrgent(){
+ const u=complaints.filter(x=>x.urgency==="High").sort((a,b)=>b.score-a.score);
+ document.getElementById("urgentCards").innerHTML=u.map(c=>`<div class="card urgent"><div class="section-head"><h2>#${c.id}</h2><span class="pill high">${c.score}/100</span></div><div class="mini">${c.date} · ${esc(c.product)}</div><p style="font-size:13px;line-height:1.55">${esc(c.complaint)}</p><p><b>${c.category}</b> · ${c.sentiment}</p><button class="btn" onclick="detail(${c.id})">Inspect case</button></div>`).join("");
+}
+function renderReplies(){
+ const u=complaints.filter(x=>x.sentiment==="Unhappy").slice(0,8);
+ document.getElementById("replyList").innerHTML=u.map(c=>`<div class="issue"><div class="issue-top"><span>#${c.id} · ${c.category}</span><span class="pill ${c.urgency.toLowerCase()}">${c.urgency}</span></div><p style="font-size:12px"><b>Complaint:</b> ${esc(c.complaint)}</p><div class="reply"><b>Suggested reply:</b><br>${suggest(c)}</div><div style="margin-top:9px"><button class="btn primary" onclick="approve(${c.id})">Approve draft</button> <button class="btn" onclick="detail(${c.id})">Review</button></div></div>`).join("");
+}
+function suggest(c){
+ if(c.category==="Billing & Refunds") return "We’re sorry for the delay with your refund. We understand how frustrating this is. Our team will verify the refund status and provide you with an update.";
+ if(c.category==="Delivery") return "We’re sorry your delivery did not arrive as expected. We’ll check the delivery status and help resolve the issue as quickly as possible.";
+ if(c.category==="Product Quality") return "We’re sorry the product did not meet expectations. We’ll review the issue and help arrange the appropriate resolution.";
+ if(c.category==="App & Website"||c.category==="Account & Login") return "We’re sorry you’re experiencing this issue. We’ll review the technical problem and help you regain normal access to the service.";
+ return "We’re sorry for the inconvenience. We’ve recorded your concern and will review it with the relevant team.";
+}
+function detail(id){
+ const c=complaints.find(x=>x.id===id); if(!c)return;
+ document.getElementById("modalContent").innerHTML=`<h2>Complaint #${c.id}</h2><p class="muted">${c.date} · ${esc(c.product)}</p><div class="card" style="box-shadow:none"><p style="line-height:1.6">${esc(c.complaint)}</p><p><b>Category:</b> ${c.category}</p><p><b>Sentiment:</b> ${c.sentiment}</p><p><b>Urgency:</b> ${c.urgency} (${c.score}/100)</p><p><b>Priority signal:</b> ${c.priority}/100</p></div><h3>Suggested response</h3><div class="reply">${suggest(c)}</div>`;
+ document.getElementById("modal").classList.add("show");
+}
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+function approve(id){alert("Draft for complaint #"+id+" marked as reviewed/approved for this demo.")}
+async function loadBackendMetrics(){
+ try{const r=await fetch("/api/metrics");if(!r.ok)throw Error();const m=await r.json();document.getElementById("mlAccuracy").textContent=m.accuracy+"%";document.getElementById("mlF1").textContent=m.f1+"%";document.getElementById("mlMeta").textContent=`${m.train_size} train / ${m.test_size} test • ${m.features} TF-IDF features • ${m.epochs} epochs`;setBackendStatus(true);}catch(e){setBackendStatus(false);}
+}
+function setBackendStatus(ok){const el=document.getElementById("backendStatus");el.textContent=ok?"Python backend: online":"Python backend: offline";el.className="pill "+(ok?"good":"high");}
+function refresh(){
+ stats();renderIssueList();renderUrgentMini();renderComplaints();renderIssues();renderUrgent();renderReplies();renderBenchmark();chartsRender();
+ const cats=[...new Set(complaints.map(x=>x.category))];
+ document.getElementById("catFilter").innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option>${c}</option>`).join("");
+}
+function resetDemo(){location.reload()}
+document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById(b.dataset.page).classList.add("active");let titles={dashboard:["Complaint Intelligence Dashboard","Monitor volume, customer sentiment, urgency and the issues driving complaints."],complaints:["All Complaints","Search, filter and inspect individual complaint records."],issues:["Problem Groups","See which recurring issues deserve management attention first."],urgent:["Urgent Cases","Monitor high-risk complaints that require human review."],replies:["Suggested Replies","Review AI-style response drafts before sending."],about:["Project & Method","ComplaintIQ system overview and submission notes."],lab:["Neural Lab","Train, evaluate and inspect the in-browser neural network (backpropagation from scratch)."],benchmark:["Feedback Benchmark","Review customer feedback on a 1–10 scale and identify areas that need attention."]};document.getElementById("pageTitle").textContent=titles[b.dataset.page][0];document.getElementById("pageDesc").textContent=titles[b.dataset.page][1];if(b.dataset.page==="dashboard")setTimeout(chartsRender,50)}));
+["search","catFilter","urgFilter","sentFilter"].forEach(id=>document.getElementById(id).addEventListener("input",renderComplaints));
+refresh();
+loadBackendMetrics();
+</script>
+<script>
+/* ==========================================================================
+   In-browser neural network (no libraries).
+   Float64Array-backed matrices simulate NumPy:  X @ W  ->  mm(X, W)
+   Architecture:  TF-IDF (N x V) -> Dense+ReLU (V x H) -> Dense+Sigmoid (H x 1)
+   Loss: binary cross-entropy (+ optional L2).  Gradients are derived by hand
+   with the chain rule (see the "Backpropagation maths" card in Neural Lab).
+   ========================================================================== */
+const POS = [
+"I love this product and it works perfectly","Great service and very helpful support","Delivery was fast and everything was excellent",
+"Happy with my purchase","The app is easy to use and runs smoothly","Excellent quality, I am very satisfied",
+"Thank you, the issue was solved quickly","Amazing experience, I will buy again","My refund arrived quickly and the agent was kind",
+"The package arrived on time and perfectly packed","Customer support was friendly and fixed my problem in minutes","The new update made the app faster and easier",
+"Logging in is simple and the app never crashes","Fantastic product, exactly as described","The agent went above and beyond to help me",
+"Billing was clear and my payment went through without problems","I received my refund within two days, great job","Superb build quality and great value for money",
+"Support answered right away and fixed everything","Smooth checkout and the order arrived a day early","The website is clean, fast and simple to use",
+"Impressed by how quickly my issue was handled","Cancelling my subscription was easy and the team was polite","Wonderful experience from order to delivery",
+"The replacement arrived quickly and works great","Best customer service I have had in years","Really pleased with the quality of this item",
+"Everything worked as expected, no complaints at all","The courier was polite and my order arrived safely","The mobile app is reliable and looks lovely",
+"Quick response from the team, I appreciate the help","Highly recommend this store, outstanding service","The problem was fixed on the first call, very efficient",
+"Delighted with my new headphones, the sound is brilliant","Reset my password in seconds, very convenient","Perfect packaging and the product was in excellent condition",
+"Thanks for the quick refund, I really appreciate it","Easy to order, easy to track and delivered on schedule","This is the best purchase I have made this year",
+"The delivery was a little late but support fixed it and I am happy","I got a full refund without any hassle","Support was responsive and kind, problem solved",
+"Great job team, the issue is completely resolved","The account recovery process was quick and painless","Very satisfied with the speed of delivery and the quality"];
+const NEG = [
+"The product has problems and I am unhappy","My package is late and damaged","I want a refund because this is broken",
+"Terrible service and nobody helped me","The app keeps crashing and I cannot login","Very disappointed with the quality",
+"I was charged twice and support ignored me","This is frustrating and unacceptable","My order is missing and I am angry",
+"Worst experience ever, I want to cancel","Fraudulent charge on my account and no one responds","The heater caused a burn and I need help",
+"My money has not been returned for weeks and nobody replies","The parcel arrived crushed and the item is unusable","The app crashes every time I try to pay",
+"Delivery was days late and the courier was rude","I never received my parcel but it says delivered","The support agent was unhelpful and hung up on me",
+"I contacted support four times with no resolution","The website is slow and keeps freezing","I cannot reset my password and the email never comes",
+"There is no way to cancel and they keep charging my card","The item stopped working after two days, poor quality","Wrong product delivered and nobody will replace it",
+"Awful customer service, I waited an hour on the phone","The billing is confusing and I was overcharged","My account was locked and nobody can help me",
+"Very bad experience, I will never order again","The refund was rejected for no reason and I am furious","Packaging was torn and the product arrived broken",
+"Nobody answers my emails, this is unacceptable","I feel cheated, the product is not as described","Support closed my ticket without solving anything",
+"Slow shipping, bad packaging and no apology","The charger sparked and burned my hand, dangerous product","Unauthorised payment from my account, I will call my lawyer",
+"Product is nice but it broke after two days and support will not answer","Still no refund after three complaints, this is ridiculous","The tracking page says delivered but the box is not here",
+"Not satisfied, the product does not match the photos","The update broke the app and now nothing loads","Constant errors on the website, I gave up",
+"Charged the wrong amount and they will not correct it","A frustrating experience from start to finish","The invoice is wrong again and nobody fixes it"];
+const DATA = [...NEG.map(t=>[t,0]), ...POS.map(t=>[t,1])];
+
+const NN = (() => {
+  // ---------- text preprocessing (mirrors the Pandas clean_text step) ----------
+  const STOP = new Set("a an the and or of to in on at for with is are was were be been am i me my we our you your it its this that these those as by from so then than there their they them he she his her will would can could should do does did have has had just very really also".split(" "));
+  const clean = s => String(s ?? "").toLowerCase().replace(/won't/g,"will not").replace(/can't|cannot/g,"cannot")
+                       .replace(/n't\b/g," not").replace(/[^a-z0-9\s]/g," ");
+  const tokens = s => { // unigrams + bigrams, stop-words removed (negations are kept on purpose)
+    const w = (clean(s).match(/\b\w\w+\b/g) || []).filter(x => !STOP.has(x)), o = [...w];
+    for (let i = 0; i < w.length - 1; i++) o.push(w[i] + " " + w[i+1]);
+    return o;
+  };
+  const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+
+  // ---------- NumPy-style matrix helpers (row-major Float64Array) ----------
+  const zeros = (r, c) => ({ r, c, d: new Float64Array(r * c) });
+  const randn = (r, c, sd, rng) => { const m = zeros(r, c);
+    for (let i = 0; i < m.d.length; i++) m.d[i] = sd * Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+    return m; };
+  const mm  = (A, B) => { const C = zeros(A.r, B.c);            // A @ B   (skips zeros: TF-IDF is sparse)
+    for (let i = 0; i < A.r; i++) for (let k = 0; k < A.c; k++) { const a = A.d[i*A.c+k]; if (!a) continue;
+      for (let j = 0; j < B.c; j++) C.d[i*B.c+j] += a * B.d[k*B.c+j]; } return C; };
+  const mtm = (A, B) => { const C = zeros(A.c, B.c);            // A.T @ B
+    for (let i = 0; i < A.r; i++) for (let k = 0; k < A.c; k++) { const a = A.d[i*A.c+k]; if (!a) continue;
+      for (let j = 0; j < B.c; j++) C.d[k*B.c+j] += a * B.d[i*B.c+j]; } return C; };
+  const mmt = (A, B) => { const C = zeros(A.r, B.r);            // A @ B.T
+    for (let i = 0; i < A.r; i++) for (let k = 0; k < B.r; k++) { let s = 0;
+      for (let j = 0; j < A.c; j++) s += A.d[i*A.c+j] * B.d[k*B.c+j]; C.d[i*B.r+k] = s; } return C; };
+
+  // ---------- TF-IDF (same formula as scikit-learn: smooth idf, sublinear tf, L2 norm) ----------
+  function fitTfidf(docs, maxF = 600) {
+    const df = new Map(); docs.forEach(d => new Set(tokens(d)).forEach(t => df.set(t, (df.get(t) || 0) + 1)));
+    const vocab = [...df].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, maxF).map(e => e[0]);
+    const idx = new Map(vocab.map((t, i) => [t, i])), n = docs.length;
+    return { vocab, idx, idf: Float64Array.from(vocab, t => Math.log((1 + n) / (1 + df.get(t))) + 1) };
+  }
+  function transform(v, docs) {
+    const V = v.vocab.length, X = zeros(docs.length, V);
+    docs.forEach((d, i) => { const tf = Object.create(null);
+      tokens(d).forEach(t => { if (v.idx.has(t)) tf[t] = (tf[t] || 0) + 1; });
+      let nrm = 0; for (const t in tf) { const j = v.idx.get(t), x = (1 + Math.log(tf[t])) * v.idf[j]; X.d[i*V+j] = x; nrm += x*x; }
+      nrm = Math.sqrt(nrm) || 1; for (const t in tf) X.d[i*V+v.idx.get(t)] /= nrm; });
+    return X;
+  }
+  function prepare(data, { testFrac = .25, seed = 42, maxF = 600 } = {}) {   // stratified train/test split
+    const rng = mulberry(seed), tr = [], te = [];
+    [0, 1].forEach(c => { const a = data.filter(r => r[1] === c);
+      for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+      const nt = Math.round(a.length * testFrac); te.push(...a.slice(0, nt)); tr.push(...a.slice(nt)); });
+    const vec = fitTfidf(tr.map(r => r[0]), maxF);
+    return { vec, tr, te, Xtr: transform(vec, tr.map(r => r[0])), ytr: Float64Array.from(tr, r => r[1]),
+             Xte: transform(vec, te.map(r => r[0])), yte: Float64Array.from(te, r => r[1]) };
+  }
+
+  // ---------- model: forward pass, loss, manual backprop, optimiser ----------
+  const init = (V, H, seed) => { const rng = mulberry(seed);
+    return { W1: randn(V, H, Math.sqrt(2 / V), rng), b1: new Float64Array(H), W2: randn(H, 1, Math.sqrt(2 / H), rng), b2: new Float64Array(1) }; };
+  function fwd(m, X) {
+    const H = m.b1.length, Z1 = mm(X, m.W1);                                   // Z1 = X W1 + b1
+    for (let i = 0; i < X.r; i++) for (let j = 0; j < H; j++) Z1.d[i*H+j] += m.b1[j];
+    const A1 = zeros(X.r, H); for (let k = 0; k < Z1.d.length; k++) A1.d[k] = Z1.d[k] > 0 ? Z1.d[k] : 0;   // ReLU
+    const Z2 = mm(A1, m.W2), p = new Float64Array(X.r);                        // p = sigmoid(A1 W2 + b2)
+    for (let i = 0; i < X.r; i++) p[i] = 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, Z2.d[i] + m.b2[0]))));
+    return { Z1, A1, p };
+  }
+  function loss(m, p, y, lam = 0) {
+    let s = 0; for (let i = 0; i < y.length; i++) s -= y[i] * Math.log(p[i] + 1e-12) + (1 - y[i]) * Math.log(1 - p[i] + 1e-12);
+    let reg = 0; for (const w of [m.W1.d, m.W2.d]) for (let k = 0; k < w.length; k++) reg += w[k] * w[k];
+    return s / y.length + lam / 2 * reg;
+  }
+  function grads(m, X, c, y, lam = 0) {            // backpropagation, step by step
+    const N = X.r, H = m.b1.length, d2 = zeros(N, 1);
+    for (let i = 0; i < N; i++) d2.d[i] = (c.p[i] - y[i]) / N;                 // dL/dz2 = (p - y)/N
+    const dW2 = mtm(c.A1, d2), db2 = new Float64Array([d2.d.reduce((a, b) => a + b, 0)]);   // dW2 = A1ᵀ d2
+    const dZ1 = mmt(d2, m.W2);                                                 // dA1 = d2 W2ᵀ
+    for (let k = 0; k < dZ1.d.length; k++) if (c.Z1.d[k] <= 0) dZ1.d[k] = 0;   // ReLU'(z) = 1[z>0]
+    const dW1 = mtm(X, dZ1), db1 = new Float64Array(H);                        // dW1 = Xᵀ dZ1
+    for (let i = 0; i < N; i++) for (let j = 0; j < H; j++) db1[j] += dZ1.d[i*H+j];
+    for (let k = 0; k < dW1.d.length; k++) dW1.d[k] += lam * m.W1.d[k];        // + λW (L2)
+    for (let k = 0; k < dW2.d.length; k++) dW2.d[k] += lam * m.W2.d[k];
+    return { W1: dW1.d, b1: db1, W2: dW2.d, b2: db2 };
+  }
+  const params = m => ({ W1: m.W1.d, b1: m.b1, W2: m.W2.d, b2: m.b2 });
+  function step(m, g, st, lr, opt) {               // 'gd' = plain gradient descent, 'adam' = Adam
+    const P = params(m); st.t++;
+    for (const k in P) { const w = P[k], gk = g[k];
+      if (opt === "gd") { for (let i = 0; i < w.length; i++) w[i] -= lr * gk[i]; continue; }
+      const M = st.m[k] ||= new Float64Array(w.length), S = st.v[k] ||= new Float64Array(w.length), c1 = 1 - .9 ** st.t, c2 = 1 - .999 ** st.t;
+      for (let i = 0; i < w.length; i++) { M[i] = .9 * M[i] + .1 * gk[i]; S[i] = .999 * S[i] + .001 * gk[i] * gk[i];
+        w[i] -= lr * (M[i] / c1) / (Math.sqrt(S[i] / c2) + 1e-8); } }
+  }
+  function gradCheck(m, X, y, lam = 0) {           // analytic vs numerical gradient (central differences)
+    const g = grads(m, X, fwd(m, X), y, lam), P = params(m), rng = mulberry(7); let worst = 0;
+    for (const k in P) for (let n = 0; n < 4; n++) {
+      const i = Math.floor(rng() * P[k].length), old = P[k][i], h = 1e-5;
+      P[k][i] = old + h; const lp = loss(m, fwd(m, X).p, y, lam);
+      P[k][i] = old - h; const lm = loss(m, fwd(m, X).p, y, lam); P[k][i] = old;
+      const num = (lp - lm) / (2 * h); worst = Math.max(worst, Math.abs(num - g[k][i]) / Math.max(1e-6, Math.abs(num) + Math.abs(g[k][i]))); }
+    return worst;
+  }
+  function metrics(p, y) {                         // same definitions as sklearn's accuracy / precision / recall / f1
+    let tp = 0, fp = 0, tn = 0, fn = 0; p.forEach((q, i) => { const h = q >= .5 ? 1 : 0; if (h && y[i]) tp++; else if (h) fp++; else if (y[i]) fn++; else tn++; });
+    const prec = tp / (tp + fp || 1), rec = tp / (tp + fn || 1);
+    return { tp, fp, tn, fn, acc: (tp + tn) / y.length, prec, rec, f1: prec + rec ? 2 * prec * rec / (prec + rec) : 0 };
+  }
+  function trainAsync(D, cfg, onTick) {            // chunked so the page stays responsive and curves update live
+    return new Promise(done => {
+      const m = init(D.vec.vocab.length, cfg.hidden, cfg.seed || 1), st = { t: 0, m: {}, v: {} }, h = { trL: [], teL: [], trA: [], teA: [] };
+      let ep = 0;
+      const run = () => {
+        const n = Math.min(cfg.perTick || 10, cfg.epochs - ep);
+        for (let k = 0; k < n; k++, ep++) {
+          const c = fwd(m, D.Xtr), t = fwd(m, D.Xte);
+          h.trL.push(loss(m, c.p, D.ytr, cfg.lam)); h.teL.push(loss(m, t.p, D.yte, cfg.lam));
+          h.trA.push(metrics(c.p, D.ytr).acc); h.teA.push(metrics(t.p, D.yte).acc);
+          step(m, grads(m, D.Xtr, c, D.ytr, cfg.lam), st, cfg.lr, cfg.opt);
+        }
+        onTick && onTick(h, ep);
+        ep < cfg.epochs ? setTimeout(run, 0) : done({ m, vec: D.vec, D, h, cfg });
+      };
+      run();
+    });
+  }
+  const score = (M, texts) => fwd(M.m, transform(M.vec, texts)).p;
+  function predict(M, text) {                      // probability + per-word "gradient x input" attribution (backprop w.r.t. the input)
+    const X = transform(M.vec, [text]), c = fwd(M.m, X), p = c.p[0], H = M.m.b1.length, V = X.c, s = p * (1 - p), out = [];
+    const w = Float64Array.from({ length: H }, (_, h) => c.Z1.d[h] > 0 ? M.m.W2.d[h] : 0);
+    for (let j = 0; j < V; j++) { if (!X.d[j]) continue; let g = 0; for (let h = 0; h < H; h++) g += M.m.W1.d[j*H+h] * w[h];
+      out.push([M.vec.vocab[j], X.d[j] * g * s]); }
+    return { p, contrib: out.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])) };
+  }
+  return { clean, prepare, trainAsync, fwd, loss, grads, init, gradCheck, metrics, score, predict };
+})();
+
+</script>
+<script>
+/* ===== Neural Lab UI + in-browser CSV analysis (uses NN from the engine script) ===== */
+(() => {
+const $ = id => document.getElementById(id);
+let M = null;
+const pct = x => (x * 100).toFixed(1) + "%";
+const sentOf = p => p >= .6 ? "Happy" : p <= .4 ? "Unhappy" : "Neutral";   // 0.4-0.6 = uncertain band -> Neutral
+const pill = (t, c) => { const e = $("nnStatus"); e.textContent = t; e.className = "pill " + c; };
+
+// ---- same rules as backend.py ----
+const CAT = [["Billing & Refunds",["refund","charged","billing","payment","money"]],["Delivery",["delivery","package","shipping","order","late"]],["Account & Login",["login","password","account","sign in"]],["App & Website",["app","website","crash","browser"]],["Product Quality",["broken","damaged","quality","defect","product"]],["Cancellation",["cancel"]],["Customer Service",["support","agent","service","help"]]];
+const category = t => { t = t.toLowerCase(); for (const [c, w] of CAT) if (w.some(x => t.includes(x))) return c; return "Other"; };
+const urgencyScore = t => { t = t.toLowerCase(); const has = a => a.some(w => t.includes(w)); let s = 10;
+  if (has(["safety","injury","health","danger"])) s += 50; if (has(["legal","lawyer","court","fraud","security"])) s += 40;
+  if (has(["repeated","again","third time","still not"])) s += 25; if (has(["refund","late","cancel","broken","missing"])) s += 20;
+  if (has(["angry","furious","unacceptable","worst"])) s += 10; return Math.min(100, s); };
+
+function parseCSV(t) {
+  const rows = []; let r = [], f = "", q = false; t = t.replace(/^\uFEFF/, "");
+  for (let i = 0; i < t.length; i++) { const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i+1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true; else if (ch === ",") { r.push(f); f = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && t[i+1] === "\n") i++; r.push(f); f = ""; rows.push(r); r = []; }
+    else f += ch; }
+  if (f || r.length) { r.push(f); rows.push(r); }
+  return rows.filter(x => x.some(v => v.trim()));
+}
+function analyzeLocal(rows) {
+  const hd = rows[0].map(h => h.trim().toLowerCase()), ci = hd.indexOf("complaint");
+  if (ci < 0) throw Error("CSV must contain a complaint column.");
+  const col = (r, n, d) => hd.indexOf(n) >= 0 && (r[hd.indexOf(n)] || "").trim() ? r[hd.indexOf(n)].trim() : d;
+  const recs = rows.slice(1).filter(r => (r[ci] || "").trim()), p = NN.score(M, recs.map(r => r[ci]));
+  return recs.map((r, i) => { const t = r[ci].trim(), u = urgencyScore(t), ss = +(p[i] * 10).toFixed(1);
+    const fs = Math.min(10, Math.max(1, +(ss * .75 + (10 - u / 10) * .25).toFixed(1)));
+    return { id: Number(col(r, "id", i + 1)) || i + 1, complaint: t, date: col(r, "date", "2026-10-17"), product: col(r, "product", "Uploaded"),
+      category: category(t), sentiment: sentOf(p[i]), sentiment_score: ss, urgency: u >= 70 ? "High" : u >= 40 ? "Medium" : "Low",
+      score: u, feedback_score: fs, priority: Math.round(Math.min(100, Math.max(0, u * .6 + (10 - fs) * 8))) }; });
+}
+
+// ---- plots (plain canvas, so they work offline) ----
+function curve(id, series, title, max) {
+  const cv = $(id), g = cv.getContext("2d"), W = cv.width, H = cv.height, p = 34; g.clearRect(0, 0, W, H);
+  const n = Math.max(...series.map(s => s.v.length), 2), top = max || Math.max(...series.flatMap(s => s.v), .01) * 1.1;
+  g.font = "11px sans-serif"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const y = H - p - (H - 2 * p) * i / 4; g.strokeStyle = "#e7eaf0"; g.beginPath(); g.moveTo(p, y); g.lineTo(W - 10, y); g.stroke(); g.fillStyle = "#6b7280"; g.fillText((top * i / 4).toFixed(2), 2, y + 4); }
+  g.fillStyle = "#6b7280"; g.fillText("epoch 0", p, H - 10); g.fillText(String(n), W - 40, H - 10); g.fillText(title, p, 16);
+  series.forEach((s, k) => { g.strokeStyle = s.c; g.lineWidth = 2; g.beginPath();
+    s.v.forEach((v, i) => { const x = p + (W - p - 10) * i / (n - 1), y = H - p - (H - 2 * p) * Math.min(v / top, 1); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+    g.fillStyle = s.c; g.fillText("■ " + s.n, W - 150 + k * 75, 16); });
+}
+const drawLab = h => { curve("cvLoss", [{ n: "train", c: "#4f46e5", v: h.trL }, { n: "test", c: "#d97706", v: h.teL }], "Loss (binary cross-entropy)");
+                       curve("cvAcc", [{ n: "train", c: "#4f46e5", v: h.trA }, { n: "test", c: "#d97706", v: h.teA }], "Accuracy", 1); };
+function showMetrics() {
+  const m = NN.metrics(NN.fwd(M.m, M.D.Xte).p, M.D.yte), mx = Math.max(m.tn, m.fp, m.fn, m.tp, 1);
+  $("mAcc").textContent = pct(m.acc); $("mPre").textContent = pct(m.prec); $("mRec").textContent = pct(m.rec); $("mF1").textContent = pct(m.f1);
+  const cell = v => `<td style="text-align:center;font-weight:800;background:rgba(79,70,229,${(.08 + .55 * v / mx).toFixed(2)})">${v}</td>`;
+  $("confMx").innerHTML = `<table><thead><tr><th></th><th>Pred. negative</th><th>Pred. positive</th></tr></thead><tbody><tr><th>Actual negative</th>${cell(m.tn)}${cell(m.fp)}</tr><tr><th>Actual positive</th>${cell(m.fn)}${cell(m.tp)}</tr></tbody></table>`;
+}
+
+// ---- training ----
+async function train() {
+  const cfg = { hidden: Math.min(64, +$("hHid").value || 16), lr: +$("hLr").value || .02, epochs: Math.min(1000, +$("hEp").value || 150), lam: +$("hL2").value || 0, opt: $("hOpt").value, perTick: 10 };
+  $("trainBtn").disabled = true; pill("Browser NN: training…", "neutral");
+  const D = NN.prepare(DATA);
+  $("labShapes").textContent = `X_train ${D.Xtr.r}×${D.Xtr.c} · W1 ${D.Xtr.c}×${cfg.hidden} · W2 ${cfg.hidden}×1 · test set: ${D.Xte.r} texts, ${D.Xtr.c} TF-IDF terms`;
+  M = await NN.trainAsync(D, cfg, (h, ep) => { drawLab(h); $("labStatus").textContent = `epoch ${ep}/${cfg.epochs} · loss ${h.trL.at(-1).toFixed(3)}`; });
+  showMetrics(); $("labStatus").textContent = "Trained"; $("trainBtn").disabled = false;
+  pill(`Browser NN: ready · test acc ${pct(NN.metrics(NN.fwd(M.m, D.Xte).p, D.yte).acc)}`, "good"); tryIt();
+}
+function tryIt() {
+  const t = $("tryText").value; if (!M || !t.trim()) { $("tryOut").innerHTML = '<span class="mini">Type a complaint to see the model’s prediction.</span>'; return; }
+  const r = NN.predict(M, t), s = sentOf(r.p);
+  $("tryOut").innerHTML = `<span class="pill ${s === "Happy" ? "good" : s === "Unhappy" ? "bad" : "neutral"}">${s}</span> <b>P(positive) = ${r.p.toFixed(3)}</b><div class="mini" style="margin:8px 0 4px">Words moving the prediction (gradient × input, from backprop to the input layer):</div>` +
+    r.contrib.slice(0, 8).map(([w, c]) => `<span class="pill ${c >= 0 ? "good" : "bad"}" style="margin:2px">${esc(w)} ${c >= 0 ? "+" : ""}${c.toFixed(2)}</span>`).join("");
+}
+$("trainBtn").onclick = train;
+$("hOpt").onchange = e => { $("hLr").value = e.target.value === "gd" ? 1.5 : .02; };
+$("tryText").oninput = tryIt;
+$("gcBtn").onclick = () => { if (!M) return; const e = NN.gradCheck(M.m, M.D.Xtr, M.D.ytr, M.cfg.lam);
+  $("gcOut").innerHTML = `Max relative error (backprop vs numerical): <b>${e.toExponential(2)}</b> — <span class="${e < 1e-5 ? "up" : "down"}">${e < 1e-5 ? "PASS, gradients are correct" : "check the backward pass"}</span>`; };
+$("applyBtn").onclick = () => { if (!M) return; const p = NN.score(M, complaints.map(c => c.complaint));
+  complaints.forEach((c, i) => { c.sentiment = sentOf(p[i]); }); refresh(); alert("Dashboard sentiment re-scored with the in-browser neural network."); };
+
+// ---- CSV upload: Python backend if reachable, otherwise the in-browser model ----
+$("fileInput").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return; const mode = $("engineSel").value; let recs, eng;
+  try {
+    if (mode !== "browser") try {
+      const fd = new FormData(); fd.append("file", f); const ac = new AbortController(); setTimeout(() => ac.abort(), 3000);
+      const res = await fetch("/api/analyze", { method: "POST", body: fd, signal: ac.signal }), data = await res.json();
+      if (!res.ok) throw Error(data.error || "Backend analysis failed.");
+      recs = data.records.map(x => ({ ...x, score: Number(x.urgency_score ?? x.score ?? 0), priority: Number(x.priority_score ?? x.priority ?? 0), sentiment: x.sentiment || "Unhappy", urgency: x.urgency || "Low", category: x.category || "Other" }));
+      eng = "Python backend (NumPy NN + Pandas/Scikit-learn)"; setBackendStatus(true);
+    } catch (err) { setBackendStatus(false); if (mode === "backend") throw err; }
+    if (!recs) { if (!M) throw Error("The in-browser model is still training — try again in a second."); recs = analyzeLocal(parseCSV(await f.text())); eng = "in-browser neural network"; }
+    complaints = recs; refresh(); alert(`Analysed ${recs.length} complaints with the ${eng}.`);
+  } catch (err) { alert(err.message); } finally { e.target.value = ""; }
+});
+train();
+})();
+
+</script>
+</body>
+</html>

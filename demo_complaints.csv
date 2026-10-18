@@ -1,0 +1,9 @@
+id,complaint,date,product
+2001,"I love the product, it works perfectly",2026-10-12,Headphones
+2002,"My refund has not arrived and support is ignoring me",2026-10-13,Online Order
+2003,"The package is late and arrived damaged",2026-10-14,Online Order
+2004,"The app keeps crashing and I cannot login",2026-10-15,Mobile App
+2005,"Support solved my issue quickly, thank you",2026-10-16,Support
+2006,"I was charged twice and need my money back",2026-10-16,Subscription
+2007,"This is fine but delivery took a while",2026-10-17,Online Order
+2008,"This product caused an injury and I need urgent help",2026-10-17,Product

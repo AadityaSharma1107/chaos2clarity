@@ -1,0 +1,5 @@
+# Tells Vercel's Python runtime where the Flask app object lives, since this
+# project's entrypoint is backend.py (not one of Vercel's default-recognized
+# names like app.py/main.py/server.py). See: vercel.com/docs/frameworks/backend/flask
+[tool.vercel]
+entrypoint = "backend:app"

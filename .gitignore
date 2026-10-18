@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+model_artifacts/
+.venv/
+venv/
+node_modules/
+.vercel/
